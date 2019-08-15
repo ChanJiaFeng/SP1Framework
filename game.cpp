@@ -10,11 +10,17 @@
 double  g_dElapsedTime;
 double  g_dDeltaTime;
 bool    g_abKeyPressed[K_COUNT];
+int		g_interfaceState=0;
+int		g_selectState = 0;
+int		g_volume = 56;
+int		g_renderTimes = 0;
 
 // Game specific variables here
 SGameChar   g_sChar;
+SGameMons   g_sMons;
 EGAMESTATES g_eGameState = S_SPLASHSCREEN;
-double  g_dBounceTime; // this is to prevent key bouncing, so we won't trigger keypresses more than once
+double  g_dBounceTime;// this is to prevent key bouncing, so we won't trigger keypresses more than once
+double  g_dBounceTimeO=0.0;
 
 // Console object
 Console g_Console(80, 25, "SP1 Framework");
@@ -37,6 +43,8 @@ void init( void )
 
     g_sChar.m_cLocation.X = g_Console.getConsoleSize().X / 2;
     g_sChar.m_cLocation.Y = g_Console.getConsoleSize().Y / 2;
+	g_sMons.m_cLocation.X = g_Console.getConsoleSize().X /3;
+	g_sMons.m_cLocation.Y = g_Console.getConsoleSize().Y /3;
     g_sChar.m_bActive = true;
     // sets the width, height and the font name to use in the console
     g_Console.setConsoleFont(0, 16, L"Consolas");
@@ -75,6 +83,7 @@ void getInput( void )
     g_abKeyPressed[K_LEFT]   = isKeyPressed(VK_LEFT);
     g_abKeyPressed[K_RIGHT]  = isKeyPressed(VK_RIGHT);
     g_abKeyPressed[K_SPACE]  = isKeyPressed(VK_SPACE);
+	g_abKeyPressed[K_RETURN] = isKeyPressed(VK_RETURN);
     g_abKeyPressed[K_ESCAPE] = isKeyPressed(VK_ESCAPE);
 }
 
@@ -102,8 +111,12 @@ void update(double dt)
     {
         case S_SPLASHSCREEN : splashScreenWait(); // game logic for the splash screen
             break;
-        case S_GAME: gameplay(); // gameplay logic when we are in the game
+		case S_OPTIONS : options(); // game logic for the splash screen
+			break;
+        case S_GAME : gameplay(); // gameplay logic when we are in the game
             break;
+		case S_GAMEOVER: hit(); // gameplay logic when we are in the game
+			break;
     }
 }
 //--------------------------------------------------------------
@@ -121,24 +134,119 @@ void render()
     {
         case S_SPLASHSCREEN: renderSplashScreen();
             break;
+		case S_OPTIONS: options();
+			break;
         case S_GAME: renderGame();
             break;
+		case S_GAMEOVER: dead();
+			break;
     }
     renderFramerate();  // renders debug information, frame rate, elapsed time, etc
     renderToScreen();   // dump the contents of the buffer to the screen, one frame worth of game
 }
 
+void menu()
+{
+	if (g_abKeyPressed[K_UP] && g_eGameState == 0)
+	{
+		g_selectState = 0;
+	}
+
+	else if (g_abKeyPressed[K_DOWN] && g_eGameState == 0)
+	{
+		g_selectState = 1;
+	}
+	if (g_abKeyPressed[K_RETURN])
+	{
+		if (g_selectState == 0)
+		{
+			g_eGameState = S_GAME;
+		}
+		else if (g_selectState == 1)
+		{
+			options();
+		}
+	}
+}
+
+void options()
+{
+	g_eGameState = S_OPTIONS;
+	COORD c = g_Console.getConsoleSize();
+	c.Y /= 3;
+	c.X = c.X / 2 - 10;
+	g_Console.writeToBuffer(c, "Volume", 0x03);
+	c.X +=15;
+	g_Console.writeToBuffer(c, g_volume, 0x03);
+	bool g_settingChange = false;
+	if (g_dBounceTime > g_dElapsedTime)
+	{
+		return;
+	}
+
+	if (g_abKeyPressed[K_LEFT]&&g_volume>48)
+	{
+		g_volume--;
+		g_settingChange = true;
+	}
+	if (g_abKeyPressed[K_RIGHT] && g_volume<57)
+	{
+		g_volume++;
+		g_settingChange = true;
+	}
+	if (g_settingChange)
+	{
+		g_dBounceTime = g_dElapsedTime + 0.125;
+	}
+	if (g_abKeyPressed[K_ESCAPE])
+	{
+		g_eGameState = S_SPLASHSCREEN;
+		menu();
+	}
+}
+
 void splashScreenWait()    // waits for time to pass in splash screen
 {
-    if (g_dElapsedTime > 3.0) // wait for 3 seconds to switch to game mode, else do nothing
+    if (g_interfaceState > 1) // wait for 3 seconds to switch to game mode, else do nothing
         g_eGameState = S_GAME;
 }
 
 void gameplay()            // gameplay logic
 {
-    processUserInput(); // checks if you should change states or do something else with the game, e.g. pause, exit
-    moveCharacter();    // moves the character, collision detection, physics, etc
-                        // sound can be played here too.
+	processUserInput(); // checks if you should change states or do something else with the game, e.g. pause, exit
+	moveCharacter();    // moves the character, collision detection, physics, etc
+						// sound can be played here too.
+	moveMonster();
+	hit();
+}
+
+void moveMonster()
+{
+	if (g_renderTimes < 100)
+	{
+		g_renderTimes++;
+	}
+	if (g_renderTimes == 100)
+	{
+		g_renderTimes = 0;
+		srand(time(NULL));
+		if ((rand() % 100 + 1) < 26&& (rand() % 100 + 1) > 0)
+		{
+			g_sMons.m_cLocation.X++;
+		}
+		else if ((rand() % 100 + 1) < 51&& (rand() % 100 + 1) > 25 )
+		{
+			g_sMons.m_cLocation.X--;
+		}
+		else if ((rand() % 100 + 1) < 76 && (rand() % 100 + 1) > 50)
+		{
+			g_sMons.m_cLocation.Y++;
+		}
+		else if ((rand() % 100 + 1) < 101 && (rand() % 100 + 1) > 75)
+		{
+			g_sMons.m_cLocation.Y--;
+		}
+	}
 }
 
 void moveCharacter()
@@ -167,24 +275,77 @@ void moveCharacter()
         g_sChar.m_cLocation.Y++;
         bSomethingHappened = true;
     }
-    if (g_abKeyPressed[K_RIGHT] && g_sChar.m_cLocation.X < g_Console.getConsoleSize().X - 1)
-    {
-        //Beep(1440, 30);
-        g_sChar.m_cLocation.X++;
-        bSomethingHappened = true;
-    }
-    if (g_abKeyPressed[K_SPACE])
-    {
-        g_sChar.m_bActive = !g_sChar.m_bActive;
-        bSomethingHappened = true;
-    }
-
+	if (g_abKeyPressed[K_RIGHT] && g_sChar.m_cLocation.X < g_Console.getConsoleSize().X - 1)
+	{
+		//Beep(1440, 30);
+		g_sChar.m_cLocation.X++;
+		bSomethingHappened = true;
+	}
     if (bSomethingHappened)
     {
         // set the bounce time to some time in the future to prevent accidental triggers
         g_dBounceTime = g_dElapsedTime + 0.125; // 125ms should be enough
     }
 }
+
+void hit()
+{
+	if (g_sChar.m_cLocation.X == g_sMons.m_cLocation.X&&g_sChar.m_cLocation.Y == g_sMons.m_cLocation.Y)
+	{
+		g_eGameState = S_GAMEOVER;
+		if (g_abKeyPressed[K_UP] && g_eGameState == 3)
+		{
+			g_selectState = 0;
+		}
+
+		else if (g_abKeyPressed[K_DOWN] && g_eGameState == 3)
+		{
+			g_selectState = 1;
+		}
+		dead();
+		if (g_abKeyPressed[K_RETURN])
+		{
+			if (g_selectState == 0)
+			{
+				g_sChar.m_cLocation.X = g_Console.getConsoleSize().X / 2;
+				g_sChar.m_cLocation.Y = g_Console.getConsoleSize().Y / 2;
+				g_sMons.m_cLocation.X = g_Console.getConsoleSize().X / 3;
+				g_sMons.m_cLocation.Y = g_Console.getConsoleSize().Y / 3;
+				renderGame();
+				gameplay();
+				g_eGameState = S_GAME;
+			}
+			else if (g_selectState == 1)
+			{
+				g_bQuitGame = true;
+			}
+		}
+	}
+}
+
+void dead()
+{
+	COORD c = g_Console.getConsoleSize();
+	c.Y = c.Y / 3+1;
+	c.X = c.X / 2 - 4;
+	g_Console.writeToBuffer(c, "Game Over", 0x03);
+	c.Y += 5;
+	g_Console.writeToBuffer(c, "Retry", 0x03);
+	if (g_selectState == 0)
+	{
+		c.X += 10;
+		g_Console.writeToBuffer(c, "<", 0x03);
+		c.X -= 10;
+	}
+	c.Y += 1;
+	g_Console.writeToBuffer(c, "Exit", 0x03);
+	if (g_selectState == 1)
+	{
+		c.X += 10;
+		g_Console.writeToBuffer(c, "<", 0x03);
+	}
+}
+
 void processUserInput()
 {
     // quits the game if player hits the escape key
@@ -201,21 +362,39 @@ void clearScreen()
 void renderSplashScreen()  // renders the splash screen
 {
     COORD c = g_Console.getConsoleSize();
-    c.Y /= 3;
-    c.X = c.X / 2 - 9;
-    g_Console.writeToBuffer(c, "A game in 3 seconds", 0x03);
-    c.Y += 1;
+    c.Y =c.Y/3+2;
+    c.X = c.X / 2 - 5;
+    g_Console.writeToBuffer(c, "Start", 0x03);
+	c.Y += 1;
+	g_Console.writeToBuffer(c, "Options", 0x03);
+    c.Y += 10;
     c.X = g_Console.getConsoleSize().X / 2 - 20;
-    g_Console.writeToBuffer(c, "Press <Space> to change character colour", 0x09);
+    g_Console.writeToBuffer(c, "", 0x09);
     c.Y += 1;
     c.X = g_Console.getConsoleSize().X / 2 - 9;
     g_Console.writeToBuffer(c, "Press 'Esc' to quit", 0x09);
+	menu();
+	if (g_selectState == 0)
+	{
+		c.Y -= 12;
+		c.X += 15;
+		g_Console.writeToBuffer(c, "<", 0x03);
+	}
+
+	if (g_selectState == 1)
+	{
+		c.Y -= 11;
+		c.X += 15;
+		g_Console.writeToBuffer(c, "<", 0x03);
+	}
+
 }
 
 void renderGame()
 {
     renderMap();        // renders the map to the buffer first
     renderCharacter();  // renders the character into the buffer
+	renderMonster();
 }
 
 void renderMap()
@@ -232,7 +411,7 @@ void renderMap()
         c.X = 5 * i;
         c.Y = i + 1;
         colour(colors[i]);
-        g_Console.writeToBuffer(c, " °±²Û", colors[i]);
+        g_Console.writeToBuffer(c, " Â°Â±Â²Ã›", colors[i]);
     }
 }
 
@@ -246,6 +425,17 @@ void renderCharacter()
     }
     g_Console.writeToBuffer(g_sChar.m_cLocation, (char)1, charColor);
 }
+
+void renderMonster()
+{
+	WORD charColor = 0x0C;
+	if (g_sMons.m_bActive)
+	{
+		charColor = 0x0A;
+	}
+	g_Console.writeToBuffer(g_sMons.m_cLocation, (char)20, charColor);
+}
+
 
 void renderFramerate()
 {
