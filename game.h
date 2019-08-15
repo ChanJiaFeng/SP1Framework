@@ -15,14 +15,17 @@ enum EKEYS
     K_RIGHT,
     K_ESCAPE,
     K_SPACE,
+	K_RETURN,
     K_COUNT
 };
 
 // Enumeration for the different screen states
 enum EGAMESTATES
 {
-    S_SPLASHSCREEN,
-    S_GAME,
+	S_SPLASHSCREEN,
+	S_OPTIONS,
+	S_GAME,
+	S_GAMEOVER,
     S_COUNT
 };
 
@@ -31,6 +34,12 @@ struct SGameChar
 {
     COORD m_cLocation;
     bool  m_bActive;
+};
+
+struct SGameMons
+{
+	COORD m_cLocation;
+	bool  m_bActive;
 };
 
 void init        ( void );      // initialize your variables, allocate memory, etc
@@ -42,6 +51,9 @@ void shutdown    ( void );      // do clean up, free memory
 void splashScreenWait();    // waits for time to pass in splash screen
 void gameplay();            // gameplay logic
 void moveCharacter();       // moves the character, collision detection, physics, etc
+void moveMonster();
+void hit();
+void dead();
 void processUserInput();    // checks if you should change states or do something else with the game, e.g. pause, exit
 void clearScreen();         // clears the current screen and draw from scratch 
 void renderSplashScreen();  // renders the splash screen
@@ -50,5 +62,10 @@ void renderMap();           // renders the map to the buffer first
 void renderCharacter();     // renders the character into the buffer
 void renderFramerate();     // renders debug information, frame rate, elapsed time, etc
 void renderToScreen();      // dump the contents of the buffer to the screen, one frame worth of game
+void renderMonster();
+void menu();
+void options();
+
+#endif // _GAME_H
 
 #endif // _GAME_H
