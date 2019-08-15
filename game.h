@@ -67,5 +67,3 @@ void menu();
 void options();
 
 #endif // _GAME_H
-
-#endif // _GAME_H
